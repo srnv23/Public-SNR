@@ -1,0 +1,81 @@
+<!-- wp:html -->
+<div id="st-public-snr" style="font-weight:700;font-size:22px;margin-top:10px;">
+  Public SNR Score = <span id="st-snr-val">—</span>
+  <span id="st-snr-debug" style="font-weight:400;font-size:12px;opacity:.65;margin-left:8px;"></span>
+</div>
+
+<script>
+(function(){
+  // Weights (keep these exactly as your 4 options)
+  const weightMap = [
+    { match: /mostly\s*noise/i, w: 2 },
+    { match: /mixed\s*signal/i, w: 5 },
+    { match: /clear\s*signal/i, w: 8 },
+    { match: /perfect\s*signal/i, w: 10 }
+  ];
+
+  function computeSNR(){
+    const out = document.getElementById('st-snr-val');
+    if (!out) return;
+
+    const pollRoot = document.querySelector('.totalpoll');
+    if (!pollRoot) { out.textContent = '—'; return; }
+
+    // Grab each "choice card" by taking the nearest container that includes a % sign
+    // This is intentionally generic to survive template markup changes.
+    const choiceBlocks = Array.from(pollRoot.querySelectorAll('div, li'))
+      .filter(el => /%/.test(el.innerText) && (
+        /mixed\s*signal/i.test(el.innerText) ||
+        /mostly\s*noise/i.test(el.innerText) ||
+        /clear\s*signal/i.test(el.innerText) ||
+        /perfect\s*signal/i.test(el.innerText)
+      ));
+
+    let weighted = 0;
+    let found = 0;
+
+    choiceBlocks.forEach(block => {
+      const text = block.innerText || '';
+
+      // Identify which option this block corresponds to
+      const wm = weightMap.find(x => x.match.test(text));
+      if (!wm) return;
+
+      // Extract the first percentage inside this block (e.g., 41.67%)
+      const m = text.match(/(\d+(?:\.\d+)?)\s*%/);
+      const pct = m ? parseFloat(m[1]) : NaN;
+      if (!isFinite(pct)) return;
+
+      weighted += pct * wm.w;
+      found++;
+    });
+
+    // Expect 4 options; if not found, still compute but show a subtle marker
+    if (found >= 2){
+      const snr = weighted / 100;
+      out.textContent = snr.toFixed(1) + ' / 10';
+    } else {
+      out.textContent = '—';
+    }
+  }
+
+  // initial
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', computeSNR);
+  } else {
+    computeSNR();
+  }
+
+  // after vote (TotalPoll updates via AJAX sometimes)
+  document.addEventListener('click', function(e){
+    if (e.target && e.target.closest && e.target.closest('.totalpoll')){
+      // recompute a few times to catch the async refresh
+      setTimeout(computeSNR, 400);
+      setTimeout(computeSNR, 900);
+      setTimeout(computeSNR, 1500);
+    }
+  });
+})();
+</script>
+
+<!-- /wp:html -->
